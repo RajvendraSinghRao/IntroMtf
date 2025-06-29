@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NSE 3000+ Stocks - Hybrid Viewer</title>
+  <title>All NSE Stocks with Live Price</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #f2f2f2;
-      margin: 0;
       padding: 20px;
     }
     h2 {
@@ -20,75 +19,100 @@
       margin-top: 20px;
     }
     th, td {
-      border: 1px solid #ccc;
       padding: 10px;
-      text-align: left;
+      border: 1px solid #ccc;
     }
     th {
       background: #333;
-      color: #fff;
+      color: white;
     }
-    #loading {
-      text-align: center;
-      font-weight: bold;
+    #searchBox {
+      width: 100%;
       padding: 10px;
+      font-size: 16px;
+      margin-bottom: 15px;
     }
   </style>
 </head>
 <body>
 
-  <h2>NSE 3000+ Stocks Price (From Google Sheets)</h2>
-  <div id="loading">Loading stock prices...</div>
-  <table id="stock-table">
+  <h2>All NSE Stocks with Live Prices (Google Sheet)</h2>
+  <input type="text" id="searchBox" placeholder="Search by name or symbol...">
+
+  <table>
     <thead>
-      <tr><th>Symbol</th><th>Price</th></tr>
+      <tr>
+        <th>Name</th>
+        <th>Symbol</th>
+        <th>Live Price</th>
+        <th>Chart</th>
+      </tr>
     </thead>
-    <tbody></tbody>
+    <tbody id="stockTableBody"></tbody>
   </table>
 
-  <h2>Top Stocks - Live Chart (TradingView)</h2>
-  <!-- TradingView Ticker -->
-  <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
-  {
-    "symbols": [
-      { "proName": "NSE:RELIANCE", "title": "Reliance" },
-      { "proName": "NSE:TCS", "title": "TCS" },
-      { "proName": "NSE:INFY", "title": "Infosys" },
-      { "proName": "NSE:HDFCBANK", "title": "HDFC Bank" }
-    ],
-    "colorTheme": "light",
-    "displayMode": "adaptive",
-    "locale": "en"
-  }
-  </script>
-
   <script>
-    const sheetUrls = [
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vExampleLink/pub?gid=0&single=true&output=csv"
-      // Add more sheet URLs here if split into multiple
+    // Load your uploaded JSON list here
+    const stockList = [
+      { symbol: "RELIANCE", name: "Reliance Industries Limited" },
+      { symbol: "TCS", name: "Tata Consultancy Services Limited" },
+      { symbol: "INFY", name: "Infosys Limited" },
+      // Add more or load from file
     ];
 
-    const tableBody = document.querySelector("#stock-table tbody");
-    const loading = document.getElementById("loading");
+    // Google Sheet URL (published as CSV)
+    const priceSheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-xyz/pub?gid=0&single=true&output=csv";
 
-    async function loadSheets() {
-      for (let url of sheetUrls) {
-        const res = await fetch(url);
-        const csv = await res.text();
-        const rows = csv.trim().split("\n").slice(1); // skip header
-        for (let row of rows) {
-          const [symbol, price] = row.split(",");
-          if (symbol && price) {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `<td>${symbol}</td><td>${price}</td>`;
-            tableBody.appendChild(tr);
-          }
+    const tbody = document.getElementById("stockTableBody");
+    const searchBox = document.getElementById("searchBox");
+
+    let livePrices = {};
+
+    async function loadPrices() {
+      const res = await fetch(priceSheetUrl);
+      const csv = await res.text();
+      const lines = csv.split("\n").slice(1);
+      lines.forEach(line => {
+        const [symbol, price] = line.split(",");
+        if (symbol && price) {
+          livePrices[symbol.trim()] = price.trim();
         }
-      }
-      loading.style.display = 'none';
+      });
     }
 
-    loadSheets();
+    function renderTable(data) {
+      tbody.innerHTML = "";
+      data.forEach(stock => {
+        const price = livePrices[stock.symbol] || 'Loading...';
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${stock.name}</td>
+          <td>${stock.symbol}</td>
+          <td>${price}</td>
+          <td><a href="https://www.tradingview.com/symbols/NSE-${stock.symbol}/" target="_blank">Chart</a></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterTable() {
+      const keyword = searchBox.value.toLowerCase();
+      const filtered = stockList.filter(s =>
+        s.name.toLowerCase().includes(keyword) ||
+        s.symbol.toLowerCase().includes(keyword)
+      );
+      renderTable(filtered);
+    }
+
+    searchBox.addEventListener("input", filterTable);
+
+    async function init() {
+      await loadPrices();
+      renderTable(stockList);
+    }
+
+    init();
+    setInterval(init, 15000); // Refresh every 15 sec
   </script>
 
 </body>
